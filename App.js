@@ -1,18 +1,24 @@
 import { StyleSheet, Text, View, ScrollView, SafeAreaView, useWindowDimensions, Button } from "react-native";
-import { WebView } from "react-native-webview";
+import { unified } from 'unified';
+import markdown from 'remark-parse';
+import slate from 'remark-slate';
+import rehypeParse from 'rehype-parse'
+import rehypeRemark from 'rehype-remark'
+import remarkStringify from 'remark-stringify'
 import { useState, useRef } from "react";
-import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery } from '@apollo/client';
+import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery, useMutation } from '@apollo/client';
 import {
   actions,
   RichEditor,
   RichToolbar,
 } from "react-native-pell-rich-editor";
 import RenderHtml from 'react-native-render-html';
+import { htmlToSlate } from 'slate-serializers'
 
 // Initialize Apollo Client
 const client = new ApolloClient({
-  uri: 'https://eu-central-1-shared-euc1-02.cdn.hygraph.com/content/cliiu60970diy01t69chc1zqv/master',
-  cache: new InMemoryCache()
+  uri: 'https://api-eu-central-1-shared-euc1-02.hygraph.com/v2/cliiu60970diy01t69chc1zqv/master',
+  cache: new InMemoryCache(),
 });
 
 const query = gql`
@@ -22,12 +28,13 @@ const query = gql`
         createdAt
         content {
           html
+          raw
         }
       }
     }
   `;
 
-const RichTextEditor = ({ initialHtml }) => {
+const RichTextEditor = ({ initialHtml, rawAst, setRichTextAst }) => {
   const richText = useRef();
 
   return (
@@ -53,6 +60,7 @@ const RichTextEditor = ({ initialHtml }) => {
         androidHardwareAccelerationDisabled={true}
         style={styles.richTextEditorStyle}
         initialContentHTML={initialHtml}
+        onChange={(htmlString) => setRichTextAst(htmlToSlate(htmlString))}
       />
     </View>
   )
@@ -69,16 +77,63 @@ const TinyThoughWebview = ({ htmlString }) => {
 
 }
 
-const TinyThoughtItem = ({ htmlString }) => {
+const MUTATION = gql`
+  mutation createTinyThought($content:RichTextAST, $id: ID) {
+    updateTinyThought(data: {content: $content}, where: {id: $id}) {
+      content {
+        html
+      }
+    }
+  }
+`
+
+const PUBLISH_MUTATION = gql`
+  mutation publishTinyThought($id: ID) {
+    publishTinyThought(where: {id:$id }) {
+      id
+    }
+  }
+`
+
+const TinyThoughtItem = ({ initialHtml, rawAst, id }) => {
   const [editMode, setEditMode] = useState(false);
+  const [richTestSlateAst, setRichTextAst] = useState(null)
+  const [mutateTinyThought, { data, loading, error }] = useMutation(MUTATION);
+  const [publishTinyThought, { publishError }] = useMutation(PUBLISH_MUTATION);
+
+  if (error) {
+    console.log(JSON.stringify(error, null, 2));
+  }
+
+  if (publishError) {
+    console.log(JSON.stringify(publishError, null, 2));
+  }
 
   return (
     <>
       {
-        editMode ? <RichTextEditor initialHtml={htmlString} /> : <TinyThoughWebview htmlString={htmlString} />
+        editMode ?
+          <RichTextEditor
+            initialHtml={initialHtml}
+            rawAst={rawAst}
+            setRichTextAst={setRichTextAst}
+          />
+          :
+          <TinyThoughWebview htmlString={initialHtml} />
       }
       <Button
-        onPress={() => setEditMode(!editMode)}
+        onPress={() => {
+          publishTinyThought({ variables: { id } })
+        }}
+        title="publish"
+      />
+      <Button
+        onPress={() => {
+          if (editMode && richTestSlateAst) {
+            mutateTinyThought({ variables: { content: { children: richTestSlateAst }, id } })
+          }
+          setEditMode(!editMode)
+        }}
         title={editMode ? 'save' : 'edit'}
       />
     </>
@@ -97,7 +152,7 @@ const TinyThoughtsList = () => {
 
         return (
           <View key={item.id}>
-            <TinyThoughtItem htmlString={item.content.html} />
+            <TinyThoughtItem initialHtml={item.content.html} rawAst={item.content.raw} id={item.id} />
           </View>
         )
       })}
