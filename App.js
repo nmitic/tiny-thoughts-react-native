@@ -48,6 +48,7 @@ const RichTextEditor = forwardRef(
       onEdit,
       onPublish,
       onSave,
+      onDelete,
       saveButtonDisabled,
       closeButtonDisabled,
       publishButtonDisabled,
@@ -118,7 +119,10 @@ const RichTextEditor = forwardRef(
             ) : null}
           </>
         ) : (
-          <Button onPress={onEdit} title="edit" color="black" />
+          <View style={styles.buttonsContainer}>
+            <Button onPress={onEdit} title="edit" color="black" />
+            <Button onPress={onDelete} title="Delete" color="tomato" />
+          </View>
         )}
       </View>
     );
@@ -128,6 +132,17 @@ const RichTextEditor = forwardRef(
 const UPDATE_TT = gql`
   mutation updateTinyThought($content: RichTextAST, $id: ID) {
     updateTinyThought(data: { content: $content }, where: { id: $id }) {
+      id
+      content {
+        html
+      }
+    }
+  }
+`;
+
+const DELETE_TT = gql`
+  mutation deleteTinyThought($id: ID) {
+    deleteTinyThought(where: { id: $id }) {
       id
       content {
         html
@@ -182,6 +197,13 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
   ] = useMutation(UPDATE_TT);
 
   const [
+    deleteTinyThought,
+    { data: deleteData, loading: deleteLoading, error: deleteError },
+  ] = useMutation(DELETE_TT, {
+    refetchQueries: () => [{ query: QUERY_ALL_TT }],
+  });
+
+  const [
     publishTinyThought,
     { data: publishData, loading: publishLoading, error: publishError },
   ] = useMutation(PUBLISH_TT, {
@@ -221,8 +243,16 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
     });
   };
 
-  if (updateError) {
-    console.log(JSON.stringify(updateError, null, 2));
+  const handleOnDelete = () => {
+    deleteTinyThought({
+      variables: {
+        id,
+      },
+    });
+  };
+
+  if (deleteError) {
+    console.log(JSON.stringify(deleteError, null, 2));
   }
 
   return (
@@ -238,6 +268,7 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
         onSave={handleOnSave}
         onPublish={handleOnPublish}
         onClose={handleOnClose}
+        onDelete={handleOnDelete}
         showActivityIndicator={showActivityIndicator}
         showErrorMsg={showErrorMsg}
       />
@@ -247,7 +278,6 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
 
 const AddNewTinyThoughtItem = () => {
   const richTextRef = useRef();
-  const [editMode, setEditMode] = useState(false);
   const [richTextHTML, setRichTextHTML] = useState(null);
 
   const [
@@ -260,7 +290,9 @@ const AddNewTinyThoughtItem = () => {
     { data: publishData, loading: publishLoading, error: publishError },
   ] = useMutation(PUBLISH_TT, {
     refetchQueries: () => [{ query: QUERY_ALL_TT }],
-    onCompleted: () => setEditMode(false),
+    onCompleted: (data) => {
+      richTextRef.current.setContentHTML("");
+    },
   });
 
   // const publishButtonDisabled =
@@ -280,7 +312,6 @@ const AddNewTinyThoughtItem = () => {
   const showActivityIndicator = createLoading || publishLoading;
 
   const handleOnClose = () => setEditMode(false);
-  const handleOnEdit = () => setEditMode(true);
   const handleOnPublish = () => {
     publishTinyThought({
       variables: { id: createData?.createTinyThought.id },
@@ -301,12 +332,11 @@ const AddNewTinyThoughtItem = () => {
   return (
     <View style={styles.tinyThoughtItem}>
       <RichTextEditor
-        editMode={editMode}
+        editMode={true}
         ref={richTextRef}
         onChange={(htmlString) => {
           setRichTextHTML(htmlString);
         }}
-        onEdit={handleOnEdit}
         onSave={handleOnSave}
         onPublish={handleOnPublish}
         onClose={handleOnClose}
