@@ -185,7 +185,7 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
     publishTinyThought,
     { data: publishData, loading: publishLoading, error: publishError },
   ] = useMutation(PUBLISH_TT, {
-    refetchQueries: () => [{ query: query }],
+    refetchQueries: () => [{ query: QUERY_ALL_TT }],
     onCompleted: () => setEditMode(false),
   });
 
