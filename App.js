@@ -38,20 +38,25 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-const query = gql`
-  query TinyThoughtsQuery {
-    tinyThoughts(orderBy: createdAt_DESC) {
-      id
-      createdAt
-      content {
-        html
-      }
-    }
-  }
-`;
-
 const RichTextEditor = forwardRef(
-  ({ initialHtml, onChange, editMode }, ref) => {
+  (
+    {
+      initialHtml,
+      onChange,
+      editMode,
+      onClose,
+      onEdit,
+      onPublish,
+      onSave,
+      saveButtonDisabled,
+      closeButtonDisabled,
+      publishButtonDisabled,
+      showActivityIndicator,
+      showErrorMsg,
+      placeholder,
+    },
+    ref
+  ) => {
     return (
       <View>
         {editMode ? (
@@ -79,15 +84,51 @@ const RichTextEditor = forwardRef(
           onChange={onChange}
           disabled={!editMode}
           editorStyle={styles.editorStyle}
+          placeholder={placeholder}
         />
+        {editMode ? (
+          <>
+            <View style={styles.buttonsContainer}>
+              <Button
+                onPress={onPublish}
+                title="publish"
+                disabled={publishButtonDisabled}
+                color="black"
+              />
+              <Button
+                onPress={onSave}
+                title="save"
+                disabled={saveButtonDisabled}
+                color="black"
+              />
+              <Button
+                onPress={onClose}
+                title="close"
+                disabled={closeButtonDisabled}
+                color="black"
+              />
+            </View>
+            {showActivityIndicator ? (
+              <ActivityIndicator size="large" color="white" />
+            ) : null}
+            {showErrorMsg ? (
+              <Text style={styles.errorMsg}>
+                Error while updating or fetching
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          <Button onPress={onEdit} title="edit" color="black" />
+        )}
       </View>
     );
   }
 );
 
-const MUTATION = gql`
-  mutation createTinyThought($content: RichTextAST, $id: ID) {
+const UPDATE_TT = gql`
+  mutation updateTinyThought($content: RichTextAST, $id: ID) {
     updateTinyThought(data: { content: $content }, where: { id: $id }) {
+      id
       content {
         html
       }
@@ -95,9 +136,32 @@ const MUTATION = gql`
   }
 `;
 
-const PUBLISH_MUTATION = gql`
+const CREATE_NEW_TT = gql`
+  mutation createTinyThought($content: RichTextAST) {
+    createTinyThought(data: { content: $content }) {
+      id
+      content {
+        html
+      }
+    }
+  }
+`;
+
+const PUBLISH_TT = gql`
   mutation publishTinyThought($id: ID) {
     publishTinyThought(where: { id: $id }) {
+      id
+      createdAt
+      content {
+        html
+      }
+    }
+  }
+`;
+
+const QUERY_ALL_TT = gql`
+  query TinyThoughtsQuery {
+    tinyThoughts(orderBy: createdAt_DESC) {
       id
       createdAt
       content {
@@ -111,16 +175,55 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
   const richTextRef = useRef();
   const [editMode, setEditMode] = useState(false);
   const [richTextHTML, setRichTextHTML] = useState(initialHtml);
+
   const [
     mutateTinyThought,
     { data: updateData, loading: updateLoading, error: updateError },
-  ] = useMutation(MUTATION);
+  ] = useMutation(UPDATE_TT);
+
   const [
     publishTinyThought,
     { data: publishData, loading: publishLoading, error: publishError },
-  ] = useMutation(PUBLISH_MUTATION, {
+  ] = useMutation(PUBLISH_TT, {
     refetchQueries: () => [{ query: query }],
+    onCompleted: () => setEditMode(false),
   });
+
+  // const publishButtonDisabled =
+  //   updateLoading ||
+  //   publishData?.publishTinyThought.content.html ===
+  //     updateData?.updateTinyThought.content.html;
+
+  // const saveButtonDisabled =
+  //   updateLoading ||
+  //   richTextHTML === initialHtml ||
+  //   publishData?.publishTinyThought.content.html !==
+  //     updateData?.updateTinyThought.content.html;
+
+  // const closeButtonDisabled = updateLoading;
+
+  const showErrorMsg = updateError || publishError;
+  const showActivityIndicator = updateLoading || publishLoading;
+
+  const handleOnClose = () => setEditMode(false);
+  const handleOnEdit = () => setEditMode(true);
+  const handleOnPublish = () => {
+    publishTinyThought({
+      variables: { id: updateData?.updateTinyThought.id },
+    });
+  };
+  const handleOnSave = () => {
+    mutateTinyThought({
+      variables: {
+        content: { children: htmlToSlate(richTextHTML) },
+        id,
+      },
+    });
+  };
+
+  if (updateError) {
+    console.log(JSON.stringify(updateError, null, 2));
+  }
 
   return (
     <View style={styles.tinyThoughtItem}>
@@ -131,74 +234,92 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
         onChange={(htmlString) => {
           setRichTextHTML(htmlString);
         }}
+        onEdit={handleOnEdit}
+        onSave={handleOnSave}
+        onPublish={handleOnPublish}
+        onClose={handleOnClose}
+        showActivityIndicator={showActivityIndicator}
+        showErrorMsg={showErrorMsg}
       />
+    </View>
+  );
+};
 
-      {editMode ? (
-        <>
-          <View style={styles.buttonsContainer}>
-            <Button
-              onPress={() => {
-                publishTinyThought({ variables: { id } });
-              }}
-              title="publish"
-              disabled={
-                updateLoading ||
-                publishData?.publishTinyThought.content.html ===
-                  updateData?.updateTinyThought.content.html
-              }
-              color="black"
-            />
-            <Button
-              onPress={() => {
-                mutateTinyThought({
-                  variables: {
-                    content: { children: htmlToSlate(richTextHTML) },
-                    id,
-                  },
-                });
-              }}
-              title="save"
-              disabled={
-                updateLoading ||
-                richTextHTML === initialHtml ||
-                publishData?.publishTinyThought.content.html !==
-                  updateData?.updateTinyThought.content.html
-              }
-              color="black"
-            />
-            <Button
-              onPress={() => {
-                setEditMode(false);
-              }}
-              title="close"
-              disabled={updateLoading}
-              color="black"
-            />
-          </View>
-          {updateLoading || publishLoading ? (
-            <ActivityIndicator size="large" color="white" />
-          ) : null}
-          {updateError || publishError ? (
-            <Text style={styles.errorMsg}>
-              Error while updating or fetching
-            </Text>
-          ) : null}
-        </>
-      ) : (
-        <Button
-          onPress={() => {
-            setEditMode(true);
-          }}
-          title="edit"
-          color="black"
-        />
-      )}
+const AddNewTinyThoughtItem = () => {
+  const richTextRef = useRef();
+  const [editMode, setEditMode] = useState(false);
+  const [richTextHTML, setRichTextHTML] = useState(null);
+
+  const [
+    mutateTinyThought,
+    { data: createData, loading: createLoading, error: createError },
+  ] = useMutation(CREATE_NEW_TT);
+
+  const [
+    publishTinyThought,
+    { data: publishData, loading: publishLoading, error: publishError },
+  ] = useMutation(PUBLISH_TT, {
+    refetchQueries: () => [{ query: QUERY_ALL_TT }],
+    onCompleted: () => setEditMode(false),
+  });
+
+  // const publishButtonDisabled =
+  //   updateLoading ||
+  //   publishData?.publishTinyThought.content.html ===
+  //     updateData?.updateTinyThought.content.html;
+
+  // const saveButtonDisabled =
+  //   updateLoading ||
+  //   richTextHTML === initialHtml ||
+  //   publishData?.publishTinyThought.content.html !==
+  //     updateData?.updateTinyThought.content.html;
+
+  // const closeButtonDisabled = updateLoading;
+
+  const showErrorMsg = createError || publishError;
+  const showActivityIndicator = createLoading || publishLoading;
+
+  const handleOnClose = () => setEditMode(false);
+  const handleOnEdit = () => setEditMode(true);
+  const handleOnPublish = () => {
+    publishTinyThought({
+      variables: { id: createData?.createTinyThought.id },
+    });
+  };
+  const handleOnSave = () => {
+    mutateTinyThought({
+      variables: {
+        content: { children: htmlToSlate(richTextHTML) },
+      },
+    });
+  };
+
+  if (createError) {
+    console.log(JSON.stringify(createError, null, 2));
+  }
+
+  return (
+    <View style={styles.tinyThoughtItem}>
+      <RichTextEditor
+        editMode={editMode}
+        ref={richTextRef}
+        onChange={(htmlString) => {
+          setRichTextHTML(htmlString);
+        }}
+        onEdit={handleOnEdit}
+        onSave={handleOnSave}
+        onPublish={handleOnPublish}
+        onClose={handleOnClose}
+        showActivityIndicator={showActivityIndicator}
+        showErrorMsg={showErrorMsg}
+        placeholder="Add new tiny thought"
+      />
     </View>
   );
 };
 
 const TinyThoughtsList = () => {
-  const { data, loading, refetch } = useQuery(query, {
+  const { data, loading, refetch } = useQuery(QUERY_ALL_TT, {
     notifyOnNetworkStatusChange: true,
   });
 
@@ -217,6 +338,7 @@ const TinyThoughtsList = () => {
         <RefreshControl refreshing={loading} onRefresh={onRefresh} />
       }
     >
+      <AddNewTinyThoughtItem />
       {data.tinyThoughts.map((item) => {
         return (
           <TinyThoughtItem
@@ -269,7 +391,7 @@ const styles = StyleSheet.create({
   },
 
   errorMsg: {
-    color: "white",
+    color: "red",
   },
   editorStyle: {
     backgroundColor: "black",
