@@ -44,14 +44,13 @@ const query = gql`
       createdAt
       content {
         html
-        raw
       }
     }
   }
 `;
 
 const RichTextEditor = forwardRef(
-  ({ initialHtml, setRichTextHTML, editMode }, ref) => {
+  ({ initialHtml, onChange, editMode }, ref) => {
     return (
       <View>
         {editMode ? (
@@ -76,9 +75,7 @@ const RichTextEditor = forwardRef(
           ref={ref}
           androidHardwareAccelerationDisabled={true}
           initialContentHTML={initialHtml}
-          onChange={(htmlString) => {
-            setRichTextHTML(htmlString);
-          }}
+          onChange={onChange}
           disabled={!editMode}
           editorStyle={styles.editorStyle}
         />
@@ -101,6 +98,10 @@ const PUBLISH_MUTATION = gql`
   mutation publishTinyThought($id: ID) {
     publishTinyThought(where: { id: $id }) {
       id
+      createdAt
+      content {
+        html
+      }
     }
   }
 `;
@@ -111,20 +112,43 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
   const [richTextHTML, setRichTextHTML] = useState(initialHtml);
   const [
     mutateTinyThought,
-    { data: updateData, loading: updateLoading, error: updateError },
-  ] = useMutation(MUTATION);
+    {
+      data: updateData,
+      loading: updateLoading,
+      error: updateError,
+      client: updateClient,
+    },
+  ] = useMutation(MUTATION, {
+    onCompleted: (data) => {
+      console.log("TT updated");
+    },
+  });
   const [
     publishTinyThought,
-    { data: publishData, loading: publishLoading, error: publishError },
-  ] = useMutation(PUBLISH_MUTATION);
+    {
+      data: publishData,
+      loading: publishLoading,
+      error: publishError,
+      client: publishClient,
+    },
+  ] = useMutation(PUBLISH_MUTATION, {
+    onCompleted: (data) => {
+      console.log("TT published", JSON.stringify(data, null, 2));
+      updateClient.clearStore();
+      publishClient.clearStore();
+    },
+    refetchQueries: () => [{ query: query }],
+  });
 
   return (
     <View style={styles.tinyThoughtItem}>
       <RichTextEditor
         initialHtml={initialHtml}
-        setRichTextHTML={setRichTextHTML}
         editMode={editMode}
         ref={richTextRef}
+        onChange={(htmlString) => {
+          setRichTextHTML(htmlString);
+        }}
       />
 
       {editMode ? (
@@ -135,7 +159,11 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
                 publishTinyThought({ variables: { id } });
               }}
               title="publish"
-              disabled={updateLoading || !updateData}
+              disabled={
+                updateLoading ||
+                publishData?.publishTinyThought.content.html ===
+                  updateData?.updateTinyThought.content.html
+              }
               color="black"
             />
             <Button
@@ -148,7 +176,12 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
                 });
               }}
               title="save"
-              disabled={updateLoading}
+              disabled={
+                updateLoading ||
+                richTextHTML === initialHtml ||
+                publishData?.publishTinyThought.content.html !==
+                  updateData?.updateTinyThought.content.html
+              }
               color="black"
             />
             <Button
