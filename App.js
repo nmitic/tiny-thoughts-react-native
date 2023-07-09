@@ -7,6 +7,7 @@ import {
   Button,
   StatusBar,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { unified } from "unified";
 import markdown from "remark-parse";
@@ -30,7 +31,7 @@ import {
 } from "react-native-pell-rich-editor";
 import RenderHtml from "react-native-render-html";
 import { htmlToSlate, payloadHtmlToSlateConfig } from "slate-serializers";
-import { forwardRef } from "react";
+import { forwardRef, useCallback } from "react";
 
 const client = new ApolloClient({
   uri: "https://api-eu-central-1-shared-euc1-02.hygraph.com/v2/cliiu60970diy01t69chc1zqv/master",
@@ -112,12 +113,7 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
   const [richTextHTML, setRichTextHTML] = useState(initialHtml);
   const [
     mutateTinyThought,
-    {
-      data: updateData,
-      loading: updateLoading,
-      error: updateError,
-      client: updateClient,
-    },
+    { data: updateData, loading: updateLoading, error: updateError },
   ] = useMutation(MUTATION, {
     onCompleted: (data) => {
       console.log("TT updated");
@@ -125,17 +121,10 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
   });
   const [
     publishTinyThought,
-    {
-      data: publishData,
-      loading: publishLoading,
-      error: publishError,
-      client: publishClient,
-    },
+    { data: publishData, loading: publishLoading, error: publishError },
   ] = useMutation(PUBLISH_MUTATION, {
     onCompleted: (data) => {
       console.log("TT published", JSON.stringify(data, null, 2));
-      updateClient.clearStore();
-      publishClient.clearStore();
     },
     refetchQueries: () => [{ query: query }],
   });
@@ -216,13 +205,30 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
 };
 
 const TinyThoughtsList = () => {
-  const { data, loading } = useQuery(query);
+  const { data, loading, refetch } = useQuery(query, {
+    onCompleted: (data) => {
+      setRefreshing(false);
+    },
+    notifyOnNetworkStatusChange: true,
+  });
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    refetch();
+  }, []);
 
   if (loading) {
     return <ActivityIndicator size="large" color="white" />;
   }
   return (
-    <ScrollView overScrollMode="never" nestedScrollEnabled={true}>
+    <ScrollView
+      overScrollMode="never"
+      nestedScrollEnabled={true}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       {data.tinyThoughts.map((item) => {
         return (
           <TinyThoughtItem
