@@ -114,18 +114,11 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
   const [
     mutateTinyThought,
     { data: updateData, loading: updateLoading, error: updateError },
-  ] = useMutation(MUTATION, {
-    onCompleted: (data) => {
-      console.log("TT updated");
-    },
-  });
+  ] = useMutation(MUTATION);
   const [
     publishTinyThought,
     { data: publishData, loading: publishLoading, error: publishError },
   ] = useMutation(PUBLISH_MUTATION, {
-    onCompleted: (data) => {
-      console.log("TT published", JSON.stringify(data, null, 2));
-    },
     refetchQueries: () => [{ query: query }],
   });
 
@@ -206,27 +199,22 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
 
 const TinyThoughtsList = () => {
   const { data, loading, refetch } = useQuery(query, {
-    onCompleted: (data) => {
-      setRefreshing(false);
-    },
     notifyOnNetworkStatusChange: true,
   });
-  const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
+  const onRefresh = useCallback(() => {
     refetch();
   }, []);
 
   if (loading) {
-    return <ActivityIndicator size="large" color="white" />;
+    return null;
   }
   return (
     <ScrollView
       overScrollMode="never"
       nestedScrollEnabled={true}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl refreshing={loading} onRefresh={onRefresh} />
       }
     >
       {data.tinyThoughts.map((item) => {
