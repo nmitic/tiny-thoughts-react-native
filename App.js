@@ -25,6 +25,7 @@ import {
   useQuery,
   useMutation,
 } from "@apollo/client";
+import { offsetLimitPagination } from "@apollo/client/utilities";
 import {
   actions,
   RichEditor,
@@ -49,7 +50,25 @@ import { forwardRef, useCallback } from "react";
 
 const client = new ApolloClient({
   uri: "https://api-eu-central-1-shared-euc1-02.hygraph.com/v2/cliiu60970diy01t69chc1zqv/master",
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          tinyThoughts: {
+            // Don't cache separate results based on
+            // any of this field's arguments.
+            keyArgs: false,
+
+            // Concatenate the incoming list items with
+            // the existing list items.
+            merge(existing = [], incoming) {
+              return [...existing, ...incoming];
+            },
+          },
+        },
+      },
+    },
+  }),
 });
 
 const UPDATE_TT = gql`
@@ -98,12 +117,17 @@ const PUBLISH_TT = gql`
 `;
 
 const QUERY_ALL_TT = gql`
-  query TinyThoughtsQuery {
-    tinyThoughts(orderBy: createdAt_DESC) {
+  query TinyThoughtsQuery($first: Int, $skip: Int) {
+    tinyThoughts(first: $first, orderBy: createdAt_DESC, skip: $skip) {
       id
       createdAt
       content {
         html
+      }
+    }
+    tinyThoughtsConnection {
+      aggregate {
+        count
       }
     }
   }
@@ -297,9 +321,44 @@ const AddNewTinyThoughtItem = () => {
   );
 };
 
+const calcPagePagination = (page, limit) => {
+  return {
+    first: limit,
+    skip: page * limit,
+  };
+};
+
+const TT_TO_SHOW_PER_FETCH = 10;
+// tinyThoughtsConnection {
+//   aggregate {
+//     count
+//   }
+// }
+
+const renderFlatListItem = ({ item }) => {
+  return (
+    <TinyThoughtItem
+      initialHtml={item.content.html}
+      id={item.id}
+      key={item.id}
+    />
+  );
+};
+
 const TinyThoughtsList = () => {
-  const { data, loading, refetch } = useQuery(QUERY_ALL_TT, {
+  const [page, setPage] = useState(1);
+
+  const { data, loading, refetch, fetchMore } = useQuery(QUERY_ALL_TT, {
+    variables: {
+      first: TT_TO_SHOW_PER_FETCH,
+      skip: 0,
+    },
     notifyOnNetworkStatusChange: true,
+    fetchPolicy: "cache-and-network",
+    onCompleted: () => {
+      console.log("TT ALL FETCH FINISHED");
+      setPage((prevPage) => prevPage + 1);
+    },
   });
 
   const onRefresh = useCallback(() => {
@@ -316,14 +375,21 @@ const TinyThoughtsList = () => {
       <FlatList
         data={data.tinyThoughts}
         onRefresh={onRefresh}
+        initialNumToRender={TT_TO_SHOW_PER_FETCH}
         refreshing={loading}
-        renderItem={({ item }) => (
-          <TinyThoughtItem
-            initialHtml={item.content.html}
-            id={item.id}
-            key={item.id}
-          />
-        )}
+        onEndReached={() => {
+          const noDateLeft = data.tinyThoughtsConnection.aggregate.count % page;
+          if (noDateLeft) {
+            return;
+          }
+          fetchMore({
+            variables: {
+              first: TT_TO_SHOW_PER_FETCH,
+              skip: TT_TO_SHOW_PER_FETCH,
+            },
+          });
+        }}
+        renderItem={renderFlatListItem}
       />
     </>
   );
