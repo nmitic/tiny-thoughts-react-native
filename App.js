@@ -33,101 +33,23 @@ import RenderHtml from "react-native-render-html";
 import { htmlToSlate, payloadHtmlToSlateConfig } from "slate-serializers";
 import { forwardRef, useCallback } from "react";
 
+// const publishButtonDisabled =
+//   updateLoading ||
+//   publishData?.publishTinyThought.content.html ===
+//     updateData?.updateTinyThought.content.html;
+
+// const saveButtonDisabled =
+//   updateLoading ||
+//   richTextHTML === initialHtml ||
+//   publishData?.publishTinyThought.content.html !==
+//     updateData?.updateTinyThought.content.html;
+
+// const closeButtonDisabled = updateLoading;
+
 const client = new ApolloClient({
   uri: "https://api-eu-central-1-shared-euc1-02.hygraph.com/v2/cliiu60970diy01t69chc1zqv/master",
   cache: new InMemoryCache(),
 });
-
-const RichTextEditor = forwardRef(
-  (
-    {
-      initialHtml,
-      onChange,
-      editMode,
-      onClose,
-      onEdit,
-      onPublish,
-      onSave,
-      onDelete,
-      saveButtonDisabled,
-      closeButtonDisabled,
-      publishButtonDisabled,
-      showActivityIndicator,
-      showErrorMsg,
-      placeholder,
-    },
-    ref
-  ) => {
-    return (
-      <View>
-        {editMode ? (
-          <RichToolbar
-            editor={ref}
-            iconSize={20}
-            selectedIconTint="#873c1e"
-            iconTint="white"
-            actions={[
-              actions.setBold,
-              actions.insertBulletsList,
-              actions.insertOrderedList,
-              actions.insertLink,
-              actions.blockquote,
-              actions.redo,
-              actions.undo,
-            ]}
-            style={styles.richTextToolbarStyle}
-          />
-        ) : null}
-        <RichEditor
-          ref={ref}
-          androidHardwareAccelerationDisabled={true}
-          initialContentHTML={initialHtml}
-          onChange={onChange}
-          disabled={!editMode}
-          editorStyle={styles.editorStyle}
-          placeholder={placeholder}
-        />
-        {editMode ? (
-          <>
-            <View style={styles.buttonsContainer}>
-              <Button
-                onPress={onPublish}
-                title="publish"
-                disabled={publishButtonDisabled}
-                color="black"
-              />
-              <Button
-                onPress={onSave}
-                title="save"
-                disabled={saveButtonDisabled}
-                color="black"
-              />
-              <Button
-                onPress={onClose}
-                title="close"
-                disabled={closeButtonDisabled}
-                color="black"
-              />
-            </View>
-            {showActivityIndicator ? (
-              <ActivityIndicator size="large" color="white" />
-            ) : null}
-            {showErrorMsg ? (
-              <Text style={styles.errorMsg}>
-                Error while updating or fetching
-              </Text>
-            ) : null}
-          </>
-        ) : (
-          <View style={styles.buttonsContainer}>
-            <Button onPress={onEdit} title="edit" color="black" />
-            <Button onPress={onDelete} title="Delete" color="tomato" />
-          </View>
-        )}
-      </View>
-    );
-  }
-);
 
 const UPDATE_TT = gql`
   mutation updateTinyThought($content: RichTextAST, $id: ID) {
@@ -186,60 +108,70 @@ const QUERY_ALL_TT = gql`
   }
 `;
 
-const TinyThoughtItem = ({ initialHtml, id }) => {
-  const richTextRef = useRef();
-  const [editMode, setEditMode] = useState(false);
+const RichTextEditor = ({
+  initialHtml,
+  placeholder,
+  id,
+  handleOnEdit = () => {},
+  handleOnClose = () => {},
+  editMode = false,
+}) => {
+  const ref = useRef();
   const [richTextHTML, setRichTextHTML] = useState(initialHtml);
 
-  const [
-    mutateTinyThought,
-    { data: updateData, loading: updateLoading, error: updateError },
-  ] = useMutation(UPDATE_TT);
+  const [mutateTinyThought, { loading: updateLoading, error: updateError }] =
+    useMutation(UPDATE_TT);
+
+  const [deleteTinyThought, { loading: deleteLoading, error: deleteError }] =
+    useMutation(DELETE_TT, {
+      refetchQueries: () => [{ query: QUERY_ALL_TT }],
+    });
+
+  const [publishTinyThought, { loading: publishLoading, error: publishError }] =
+    useMutation(PUBLISH_TT, {
+      refetchQueries: () => [{ query: QUERY_ALL_TT }],
+      onCompleted: () => setEditMode(false),
+    });
 
   const [
-    deleteTinyThought,
-    { data: deleteData, loading: deleteLoading, error: deleteError },
-  ] = useMutation(DELETE_TT, {
-    refetchQueries: () => [{ query: QUERY_ALL_TT }],
-  });
+    createNewTinnyThought,
+    { loading: createLoading, error: createError },
+  ] = useMutation(CREATE_NEW_TT);
 
   const [
-    publishTinyThought,
-    { data: publishData, loading: publishLoading, error: publishError },
+    publishNewTinyThought,
+    { loading: publishNewLoading, error: publishNewError },
   ] = useMutation(PUBLISH_TT, {
     refetchQueries: () => [{ query: QUERY_ALL_TT }],
-    onCompleted: () => setEditMode(false),
+    onCompleted: () => {
+      ref.current.setContentHTML("");
+    },
   });
 
-  // const publishButtonDisabled =
-  //   updateLoading ||
-  //   publishData?.publishTinyThought.content.html ===
-  //     updateData?.updateTinyThought.content.html;
+  const showAddButtonInsteadOfSave = !Boolean(id);
 
-  // const saveButtonDisabled =
-  //   updateLoading ||
-  //   richTextHTML === initialHtml ||
-  //   publishData?.publishTinyThought.content.html !==
-  //     updateData?.updateTinyThought.content.html;
+  const showErrorMsg =
+    updateError ||
+    publishError ||
+    createError ||
+    deleteError ||
+    publishNewError;
+  const showActivityIndicator =
+    updateLoading ||
+    publishLoading ||
+    createLoading ||
+    publishNewLoading ||
+    deleteLoading;
 
-  // const closeButtonDisabled = updateLoading;
-
-  const showErrorMsg = updateError || publishError;
-  const showActivityIndicator = updateLoading || publishLoading;
-
-  const handleOnClose = () => setEditMode(false);
-  const handleOnEdit = () => setEditMode(true);
-  const handleOnPublish = () => {
-    publishTinyThought({
-      variables: { id: updateData?.updateTinyThought.id },
-    });
-  };
-  const handleOnSave = () => {
-    mutateTinyThought({
+  const handleOnSave = async () => {
+    const { data } = await mutateTinyThought({
       variables: {
         content: { children: htmlToSlate(richTextHTML) },
         id,
       },
+    });
+    await publishTinyThought({
+      variables: { id: data?.updateTinyThought.id },
     });
   };
 
@@ -251,99 +183,115 @@ const TinyThoughtItem = ({ initialHtml, id }) => {
     });
   };
 
-  if (deleteError) {
-    console.log(JSON.stringify(deleteError, null, 2));
+  const handleOnChange = (htmlString) => {
+    setRichTextHTML(htmlString);
+  };
+
+  const handleOnAdd = async () => {
+    const { data } = await createNewTinnyThought({
+      variables: {
+        content: { children: htmlToSlate(richTextHTML) },
+      },
+    });
+    await publishNewTinyThought({
+      variables: { id: data?.createTinyThought?.id },
+    });
+  };
+
+  if (showErrorMsg) {
+    console.log(
+      JSON.stringify(
+        {
+          updateError,
+          publishError,
+          createError,
+          deleteError,
+          publishNewError,
+        },
+        null,
+        2
+      )
+    );
   }
+
+  return (
+    <View>
+      {editMode ? (
+        <RichToolbar
+          editor={ref}
+          iconSize={20}
+          selectedIconTint="#873c1e"
+          iconTint="white"
+          actions={[
+            actions.setBold,
+            actions.insertBulletsList,
+            actions.insertOrderedList,
+            actions.insertLink,
+            actions.blockquote,
+            actions.redo,
+            actions.undo,
+          ]}
+          style={styles.richTextToolbarStyle}
+        />
+      ) : null}
+      <RichEditor
+        ref={ref}
+        androidHardwareAccelerationDisabled={true}
+        initialContentHTML={initialHtml}
+        onChange={handleOnChange}
+        disabled={!editMode}
+        editorStyle={styles.editorStyle}
+        placeholder={placeholder}
+      />
+      {editMode ? (
+        <>
+          <View style={styles.buttonsContainer}>
+            {showAddButtonInsteadOfSave ? (
+              <Button onPress={handleOnAdd} title="add" color="black" />
+            ) : (
+              <Button onPress={handleOnSave} title="save" color="black" />
+            )}
+            <Button onPress={handleOnClose} title="close" color="black" />
+          </View>
+          {showActivityIndicator ? (
+            <ActivityIndicator size="large" color="white" />
+          ) : null}
+          {showErrorMsg ? (
+            <Text style={styles.errorMsg}>
+              Error while updating or fetching
+            </Text>
+          ) : null}
+        </>
+      ) : (
+        <View style={styles.buttonsContainer}>
+          <Button onPress={handleOnEdit} title="edit" color="black" />
+          <Button onPress={handleOnDelete} title="Delete" color="tomato" />
+        </View>
+      )}
+    </View>
+  );
+};
+
+const TinyThoughtItem = ({ initialHtml, id }) => {
+  const [editMode, setEditMode] = useState(false);
 
   return (
     <View style={styles.tinyThoughtItem}>
       <RichTextEditor
         initialHtml={initialHtml}
+        id={id}
         editMode={editMode}
-        ref={richTextRef}
-        onChange={(htmlString) => {
-          setRichTextHTML(htmlString);
-        }}
-        onEdit={handleOnEdit}
-        onSave={handleOnSave}
-        onPublish={handleOnPublish}
-        onClose={handleOnClose}
-        onDelete={handleOnDelete}
-        showActivityIndicator={showActivityIndicator}
-        showErrorMsg={showErrorMsg}
+        handleOnClose={() => setEditMode(false)}
+        handleOnEdit={() => setEditMode(true)}
       />
     </View>
   );
 };
 
 const AddNewTinyThoughtItem = () => {
-  const richTextRef = useRef();
-  const [richTextHTML, setRichTextHTML] = useState(null);
-
-  const [
-    mutateTinyThought,
-    { data: createData, loading: createLoading, error: createError },
-  ] = useMutation(CREATE_NEW_TT);
-
-  const [
-    publishTinyThought,
-    { data: publishData, loading: publishLoading, error: publishError },
-  ] = useMutation(PUBLISH_TT, {
-    refetchQueries: () => [{ query: QUERY_ALL_TT }],
-    onCompleted: (data) => {
-      richTextRef.current.setContentHTML("");
-    },
-  });
-
-  // const publishButtonDisabled =
-  //   updateLoading ||
-  //   publishData?.publishTinyThought.content.html ===
-  //     updateData?.updateTinyThought.content.html;
-
-  // const saveButtonDisabled =
-  //   updateLoading ||
-  //   richTextHTML === initialHtml ||
-  //   publishData?.publishTinyThought.content.html !==
-  //     updateData?.updateTinyThought.content.html;
-
-  // const closeButtonDisabled = updateLoading;
-
-  const showErrorMsg = createError || publishError;
-  const showActivityIndicator = createLoading || publishLoading;
-
-  const handleOnClose = () => setEditMode(false);
-  const handleOnPublish = () => {
-    publishTinyThought({
-      variables: { id: createData?.createTinyThought.id },
-    });
-  };
-  const handleOnSave = () => {
-    mutateTinyThought({
-      variables: {
-        content: { children: htmlToSlate(richTextHTML) },
-      },
-    });
-  };
-
-  if (createError) {
-    console.log(JSON.stringify(createError, null, 2));
-  }
-
   return (
     <View style={styles.tinyThoughtItem}>
-      <RichTextEditor
-        editMode={true}
-        ref={richTextRef}
-        onChange={(htmlString) => {
-          setRichTextHTML(htmlString);
-        }}
-        onSave={handleOnSave}
-        onPublish={handleOnPublish}
-        onClose={handleOnClose}
-        showActivityIndicator={showActivityIndicator}
-        showErrorMsg={showErrorMsg}
-        placeholder="Add new tiny thought"
-      />
+      <RichTextEditor placeholder="Add new tiny thought" editMode />
     </View>
   );
 };
@@ -357,9 +305,10 @@ const TinyThoughtsList = () => {
     refetch();
   }, []);
 
-  if (loading) {
+  if (!data) {
     return null;
   }
+
   return (
     <ScrollView
       overScrollMode="never"
