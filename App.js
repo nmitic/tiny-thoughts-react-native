@@ -8,6 +8,7 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  FlatList,
 } from "react-native";
 import { unified } from "unified";
 import markdown from "remark-parse";
@@ -310,24 +311,21 @@ const TinyThoughtsList = () => {
   }
 
   return (
-    <ScrollView
-      overScrollMode="never"
-      nestedScrollEnabled={true}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={onRefresh} />
-      }
-    >
+    <>
       <AddNewTinyThoughtItem />
-      {data.tinyThoughts.map((item) => {
-        return (
+      <FlatList
+        data={data.tinyThoughts}
+        onRefresh={onRefresh}
+        refreshing={loading}
+        renderItem={({ item }) => (
           <TinyThoughtItem
             initialHtml={item.content.html}
             id={item.id}
             key={item.id}
           />
-        );
-      })}
-    </ScrollView>
+        )}
+      />
+    </>
   );
 };
 
