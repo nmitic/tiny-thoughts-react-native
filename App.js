@@ -130,7 +130,7 @@ const RichTextEditor = ({
   const [publishTinyThought, { loading: publishLoading, error: publishError }] =
     useMutation(PUBLISH_TT, {
       refetchQueries: () => [{ query: QUERY_ALL_TT }],
-      onCompleted: () => setEditMode(false),
+      onCompleted: () => handleOnClose(),
     });
 
   const [
