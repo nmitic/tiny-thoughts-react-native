@@ -310,7 +310,7 @@ const renderFlatListItem = ({ item }) => {
 };
 
 const TinyThoughtsList = () => {
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(0);
 
   const { data, loading, refetch, fetchMore } = useQuery(QUERY_ALL_TT, {
     variables: {
@@ -320,12 +320,13 @@ const TinyThoughtsList = () => {
     notifyOnNetworkStatusChange: true,
     fetchPolicy: "cache-and-network",
     onCompleted: () => {
+      console.log("FETCHED");
       setPage((prevPage) => prevPage + 1);
     },
   });
 
   const onRefresh = useCallback(() => {
-    setPage(1);
+    setPage(0);
     refetch();
   }, []);
 
@@ -342,14 +343,18 @@ const TinyThoughtsList = () => {
         initialNumToRender={TT_TO_SHOW_PER_FETCH}
         refreshing={loading}
         onEndReached={() => {
-          const noDateLeft = data.tinyThoughtsConnection.aggregate.count % page;
+          const noDateLeft =
+            Math.round(
+              data.tinyThoughtsConnection.aggregate.count / TT_TO_SHOW_PER_FETCH
+            ) <= page;
           if (noDateLeft) {
             return;
           }
+          console.log("SHOULD FETCH");
           fetchMore({
             variables: {
               first: TT_TO_SHOW_PER_FETCH,
-              skip: TT_TO_SHOW_PER_FETCH,
+              skip: TT_TO_SHOW_PER_FETCH * page,
             },
           });
         }}
