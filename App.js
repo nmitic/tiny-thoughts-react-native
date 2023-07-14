@@ -2,21 +2,13 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   SafeAreaView,
   Button,
   StatusBar,
   ActivityIndicator,
-  RefreshControl,
   FlatList,
 } from "react-native";
-import { unified } from "unified";
-import markdown from "remark-parse";
-import slate from "remark-slate";
-import rehypeParse from "rehype-parse";
-import rehypeRemark from "rehype-remark";
-import remarkStringify from "remark-stringify";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   ApolloClient,
   InMemoryCache,
@@ -25,28 +17,12 @@ import {
   useQuery,
   useMutation,
 } from "@apollo/client";
-import { offsetLimitPagination } from "@apollo/client/utilities";
 import {
   actions,
   RichEditor,
   RichToolbar,
 } from "react-native-pell-rich-editor";
-import RenderHtml from "react-native-render-html";
-import { htmlToSlate, payloadHtmlToSlateConfig } from "slate-serializers";
-import { forwardRef, useCallback } from "react";
-
-// const publishButtonDisabled =
-//   updateLoading ||
-//   publishData?.publishTinyThought.content.html ===
-//     updateData?.updateTinyThought.content.html;
-
-// const saveButtonDisabled =
-//   updateLoading ||
-//   richTextHTML === initialHtml ||
-//   publishData?.publishTinyThought.content.html !==
-//     updateData?.updateTinyThought.content.html;
-
-// const closeButtonDisabled = updateLoading;
+import { htmlToSlate } from "slate-serializers";
 
 const client = new ApolloClient({
   uri: "https://api-eu-central-1-shared-euc1-02.hygraph.com/v2/cliiu60970diy01t69chc1zqv/master",
@@ -321,19 +297,7 @@ const AddNewTinyThoughtItem = () => {
   );
 };
 
-const calcPagePagination = (page, limit) => {
-  return {
-    first: limit,
-    skip: page * limit,
-  };
-};
-
 const TT_TO_SHOW_PER_FETCH = 10;
-// tinyThoughtsConnection {
-//   aggregate {
-//     count
-//   }
-// }
 
 const renderFlatListItem = ({ item }) => {
   return (
@@ -356,12 +320,12 @@ const TinyThoughtsList = () => {
     notifyOnNetworkStatusChange: true,
     fetchPolicy: "cache-and-network",
     onCompleted: () => {
-      console.log("TT ALL FETCH FINISHED");
       setPage((prevPage) => prevPage + 1);
     },
   });
 
   const onRefresh = useCallback(() => {
+    setPage(1);
     refetch();
   }, []);
 
