@@ -227,6 +227,26 @@ const RichTextEditor = ({
           iconSize={20}
           selectedIconTint="#873c1e"
           iconTint="white"
+          iconMap={{
+            [actions.heading1]: ({ tintColor }) => (
+              <Text style={[styles.tib, { color: tintColor }]}>H1</Text>
+            ),
+            [actions.heading2]: ({ tintColor }) => (
+              <Text style={[styles.tib, { color: tintColor }]}>H2</Text>
+            ),
+            [actions.heading3]: ({ tintColor }) => (
+              <Text style={[styles.tib, { color: tintColor }]}>H3</Text>
+            ),
+            [actions.heading4]: ({ tintColor }) => (
+              <Text style={[styles.tib, { color: tintColor }]}>H4</Text>
+            ),
+            [actions.heading5]: ({ tintColor }) => (
+              <Text style={[styles.tib, { color: tintColor }]}>H4</Text>
+            ),
+            [actions.heading6]: ({ tintColor }) => (
+              <Text style={[styles.tib, { color: tintColor }]}>H6</Text>
+            ),
+          }}
           actions={[
             actions.setBold,
             actions.insertBulletsList,
@@ -235,6 +255,12 @@ const RichTextEditor = ({
             actions.blockquote,
             actions.redo,
             actions.undo,
+            actions.heading1,
+            actions.heading2,
+            actions.heading3,
+            actions.heading4,
+            actions.heading5,
+            actions.heading6,
           ]}
           style={styles.richTextToolbarStyle}
         />
