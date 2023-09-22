@@ -22,7 +22,7 @@ import {
   RichEditor,
   RichToolbar,
 } from "react-native-pell-rich-editor";
-import { htmlToSlate } from "slate-serializers";
+import { htmlToSlate, slateDemoHtmlToSlateConfig } from "slate-serializers";
 
 const client = new ApolloClient({
   uri: "https://api-eu-central-1-shared-euc1-02.hygraph.com/v2/cliiu60970diy01t69chc1zqv/master",
@@ -167,7 +167,9 @@ const RichTextEditor = ({
   const handleOnSave = async () => {
     const { data } = await mutateTinyThought({
       variables: {
-        content: { children: htmlToSlate(richTextHTML) },
+        content: {
+          children: htmlToSlate(richTextHTML, slateDemoHtmlToSlateConfig),
+        },
         id,
       },
     });
@@ -191,7 +193,9 @@ const RichTextEditor = ({
   const handleOnAdd = async () => {
     const { data } = await createNewTinnyThought({
       variables: {
-        content: { children: htmlToSlate(richTextHTML) },
+        content: {
+          children: htmlToSlate(richTextHTML, slateDemoHtmlToSlateConfig),
+        },
       },
     });
     await publishNewTinyThought({
