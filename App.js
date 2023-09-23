@@ -372,15 +372,14 @@ const TinyThoughtsList = () => {
         onRefresh={onRefresh}
         initialNumToRender={TT_TO_SHOW_PER_FETCH}
         refreshing={loading}
+        overScrollMode="never"
         onEndReached={() => {
-          const noDateLeft =
-            Math.round(
-              data.tinyThoughtsConnection.aggregate.count / TT_TO_SHOW_PER_FETCH
-            ) <= page;
-          if (noDateLeft) {
+          const noDataLeft =
+            data.tinyThoughtsConnection.aggregate.count ===
+            data.tinyThoughts.length;
+          if (noDataLeft) {
             return;
           }
-          console.log("SHOULD FETCH");
           fetchMore({
             variables: {
               first: TT_TO_SHOW_PER_FETCH,
