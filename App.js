@@ -273,6 +273,13 @@ const RichTextEditor = ({
         disabled={!editMode}
         editorStyle={styles.editorStyle}
         placeholder={placeholder}
+        usecontainer={false}
+        // TODO figure how to pass this from the FlatList
+        // onCursorPosition={flatListRef.current.scrollTo({
+        //   y: scrollY - 30,
+        //   duration: 100,
+        //   animated: true,
+        // })}
       />
       {editMode ? (
         <>
@@ -341,6 +348,7 @@ const renderFlatListItem = ({ item }) => {
 
 const TinyThoughtsList = () => {
   const [page, setPage] = useState(0);
+  const ref = useRef();
 
   const { data, loading, refetch, fetchMore } = useQuery(QUERY_ALL_TT, {
     variables: {
@@ -367,6 +375,7 @@ const TinyThoughtsList = () => {
   return (
     <>
       <FlatList
+        ref={ref}
         ListHeaderComponent={AddNewTinyThoughtItem}
         data={data.tinyThoughts}
         onRefresh={onRefresh}
