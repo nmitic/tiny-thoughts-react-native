@@ -204,7 +204,7 @@ const RichTextEditor = ({
   };
 
   if (showErrorMsg) {
-    console.log(
+    console.error(
       JSON.stringify(
         {
           updateError,
@@ -366,8 +366,8 @@ const TinyThoughtsList = () => {
 
   return (
     <>
-      <AddNewTinyThoughtItem />
       <FlatList
+        ListHeaderComponent={AddNewTinyThoughtItem}
         data={data.tinyThoughts}
         onRefresh={onRefresh}
         initialNumToRender={TT_TO_SHOW_PER_FETCH}
